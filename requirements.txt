@@ -1,0 +1,6 @@
+celery
+redis
+sqlalchemy
+psycopg2
+pillow
+argparse
