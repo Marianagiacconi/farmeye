@@ -1,12 +1,27 @@
+from celery import shared_task
 import time
 import random
 from collections import Counter
-from src.tasks.celery_config import celery
-from src.utils.database import SessionLocal
-from src.server.models import Prediction, Image
+from contextlib import contextmanager
+from utils.database import SessionLocal
+from server.models import Prediction, Image
+import logging
+from tasks.celery_config import celery
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@contextmanager
+def get_db_session():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @celery.task
-def process_image_task(image_path: str, user_id: str, num_repeats=5):
+def process_image_task(image_path: str, user_id: str):
+    """Simula el procesamiento de imágenes."""
+    num_repeats = 5
     labels = {0: "Sano", 1: "Posible Enfermedad", 2: "Enfermo"}
     results = []
 
@@ -23,12 +38,16 @@ def process_image_task(image_path: str, user_id: str, num_repeats=5):
         "details": results
     }
 
-    # Guarda en la BD
-    db = SessionLocal()
-    image = db.query(Image).filter_by(image_path=image_path).first()
-    new_prediction = Prediction(image_id=image.id, result=labels[final_prediction], confidence=90)
-    db.add(new_prediction)
-    db.commit()
-    db.close()
+    with get_db_session() as db:
+        try:
+            image = db.query(Image).filter_by(image_path=image_path).first()
+            if image:
+                new_prediction = Prediction(image_id=image.id, result=labels[final_prediction], confidence=90)
+                db.add(new_prediction)
+                db.commit()
+            else:
+                logger.error(f"No se encontró la imagen en la base de datos: {image_path}")
+        except Exception as e:
+            logger.error(f"Ocurrió un error al guardar la predicción: {e}")
 
     return result
