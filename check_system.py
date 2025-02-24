@@ -20,7 +20,7 @@ def check_server(host='127.0.0.1', port=5000):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((host, port))
-        logger.info("✅Servidor está funcionando")
+        logger.info("Servidor está funcionando")
         return True
     except Exception as e:
         logger.error(f" Error en servidor: {e}")
