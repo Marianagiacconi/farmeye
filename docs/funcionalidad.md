@@ -4,7 +4,7 @@
 
 **Cliente**
 - Envía imágenes al servidor a través de Sockets TCP.
-- Recibe los resultados del análisis a través de WebSockets.
+- Recibe los resultados del análisis a través de sockets.
 - Utiliza argparse para especificar la ruta de la imagen a enviar.
 - Permite la consulta del historial de análisis al servidor mediante una solicitud API.
 
@@ -12,7 +12,7 @@
 - Recibe conexiones concurrentes de múltiples clientes usando asyncio.
 - Almacena las imágenes en una cola de tareas distribuida en Redis, gestionada con Celery.
 - Envía las imágenes a los Workers para su procesamiento.
-- Recibe los resultados de los Workers, los almacena en PostgreSQL y notifica al Cliente mediante WebSockets.
+- Recibe los resultados de los Workers, los almacena en PostgreSQL y notifica al Cliente mediante sockets.
 - Expone una API para consultar el historial de imágenes procesadas y sus resultados.
 
 **Procesador de Imágenes (Workers)**
