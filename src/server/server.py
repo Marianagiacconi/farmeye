@@ -55,8 +55,18 @@ class ImageServer:
         db = SessionLocal()  
 
         try:
-            metadata_size = int.from_bytes(conn.recv(4), "big")
-            metadata = json.loads(conn.recv(metadata_size).decode())
+            size_data = conn.recv(4)
+            if not size_data or len(size_data) < 4:
+                raise Exception("No se recibió tamaño de metadata correctamente.")
+
+            metadata_size = int.from_bytes(size_data, "big")
+
+            metadata_bytes = conn.recv(metadata_size)
+            if not metadata_bytes:
+                raise Exception("No se recibió metadata.")
+
+            metadata = json.loads(metadata_bytes.decode())
+
 
             user_id = int(metadata["user_id"])  
             filename = metadata["image_name"]
@@ -149,9 +159,9 @@ class ImageServer:
     def start(self):
         """Inicia el servidor TCP y maneja múltiples clientes con threads."""
         try:
-            self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.server.bind((HOST, PORT))
+            self.server = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            self.server.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            self.server.bind(("::", PORT))
             self.server.listen(5)
             logger.info(f"Servidor TCP iniciado en {HOST}:{PORT}")
 

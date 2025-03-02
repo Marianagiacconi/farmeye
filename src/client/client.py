@@ -9,7 +9,7 @@ PORT = 5000
 BUFFER_SIZE = 65536  
 
 def send_images(image_paths):
-    user_id = random.randint(1, 2**31 - 1)  # Genera un user_id aleatorio
+    user_id = random.randint(1, 2**31 - 1)
     tasks = []  # Lista para almacenar los task_id recibidos
 
     for image_path in image_paths:
@@ -19,9 +19,18 @@ def send_images(image_paths):
 
         file_size = os.path.getsize(image_path)
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
+        # Resolver dirección para IPv4/IPv6
+        try:
+            family, type_, proto, canonname, sockaddr = socket.getaddrinfo(
+                HOST, PORT, socket.AF_UNSPEC, socket.SOCK_STREAM
+            )[0]
+        except Exception as e:
+            print(f"Error resolviendo la dirección: {e}")
+            continue
+
+        with socket.socket(family, type_, proto) as client:
             try:
-                client.connect((HOST, PORT))
+                client.connect(sockaddr)
 
                 filename = os.path.basename(image_path)
                 metadata = json.dumps({
@@ -32,28 +41,34 @@ def send_images(image_paths):
                 metadata_bytes = metadata.encode()
 
                 print(f"Enviando metadata ({len(metadata_bytes)} bytes)")
-                client.send(len(metadata_bytes).to_bytes(4, "big"))
-                client.send(metadata_bytes)
+                client.sendall(len(metadata_bytes).to_bytes(4, "big"))
+                client.sendall(metadata_bytes)
 
                 print(f"Enviando imagen {filename} ({file_size} bytes)...")
                 with open(image_path, "rb") as f:
                     while chunk := f.read(BUFFER_SIZE):
-                        client.send(chunk)
+                        client.sendall(chunk)
                         ack = client.recv(3)  # Esperar confirmación del servidor
                         if ack != b"ACK":
                             raise Exception("⚠️ No se recibió ACK correctamente.")
 
                 # Recibir respuesta inicial del servidor
                 response_data = client.recv(BUFFER_SIZE).decode()
+                if not response_data:
+                    raise Exception("⚠️ No se recibió respuesta del servidor.")
+
                 response = json.loads(response_data)
 
                 if "task_id" in response:
-                    print(f"✅ Imagen {filename} enviada correctamente. Task ID: {response['task_id']}")
+                    print(f"Imagen {filename} enviada correctamente. Task ID: {response['task_id']}")
                     tasks.append(response["task_id"])
                     
                     # Esperar resultado final del procesamiento
                     print(f"Esperando resultado final para la tarea {response['task_id']}...")
                     final_response_data = client.recv(BUFFER_SIZE).decode()
+                    if not final_response_data:
+                        raise Exception("⚠️ No se recibió resultado final del servidor.")
+
                     final_response = json.loads(final_response_data)
                     print(f"Resultado final recibido: {final_response}")
 
@@ -61,7 +76,7 @@ def send_images(image_paths):
                     print(f"⚠️ Error en respuesta del servidor: {response}")
 
             except ConnectionRefusedError:
-                print("No se pudo conectar con el servidor.")
+                print("No se pudo conectar con el servidor. Asegúrate de que está en ejecución.")
             except json.JSONDecodeError:
                 print("Error al decodificar la respuesta del servidor.")
             except Exception as e:
