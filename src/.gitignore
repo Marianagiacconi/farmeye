@@ -1,0 +1,18 @@
+# 🔹 Archivos de entorno
+.env
+.env.local
+.env.*.local
+
+# 🔹 Bases de datos y cachés
+
+__pycache__/
+
+# 🔹 Archivos de logs
+logs/
+*.log
+
+
+# 🔹 Virtual environments
+venv/
+
+
