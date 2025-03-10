@@ -1,15 +1,23 @@
-1. Arquitectura Concurrente
+# Informe Técnico de FarmEye
 
-El sistema maneja múltiples solicitudes de análisis simultáneamente mediante multiprocesos y colas de tareas distribuidas con Celery. Se usa Redis como message broker para distribuir tareas de procesamiento de imágenes.
+**Arquitectura Concurrente**
+- Se utiliza **Sockets TCP** en el servidor para manejar múltiples clientes simultáneamente.
+- Cada conexión de cliente se maneja en un **Thread** separado para evitar bloqueos.
+- Se usa **Multiprocessing** con Celery para procesar imágenes en paralelo.
 
-2. Comunicación Cliente-Servidor
+**Comunicación Cliente-Servidor**
+- **Sockets TCP** permiten conexiones persistentes y eficientes entre clientes y servidor.
+- **Multiprocessing Queue** se usa para enviar predicciones desde los Workers al servidor sin bloquearlo.
 
-Se utiliza Sockets TCP para permitir que múltiples clientes envíen imágenes al servidor y reciban los resultados de manera eficiente.
+**Procesamiento de Imágenes con Celery**
+- Redis actúa como **message broker** para distribuir las tareas de procesamiento.
+- Los **Celery Workers** procesan las imágenes en paralelo para mejorar el rendimiento y escalabilidad.
 
-3. Procesamiento de Imágenes con Celery
+**Almacenamiento de Datos en PostgreSQL**
+- PostgreSQL almacena los resultados de los análisis de imágenes.
+- Se diseñó un modelo de datos basado en imágenes y predicciones, permitiendo consultar diagnósticos por usuario.
 
-Cada imagen se procesa en un worker de Celery independiente para optimizar el rendimiento y permitir escalabilidad horizontal.
+**Elección de Multiproceso en Lugar de Multithread**
+- **Multiprocessing** se usa para manejar tareas pesadas como el análisis de imágenes.
+- **Threads** solo se utilizan para gestionar conexiones de clientes en el servidor.
 
-4. Almacenamiento de Datos en PostgreSQL
-
-Los resultados se guardan en PostgreSQL, permitiendo la persistencia de datos y futuras consultas sobre los diagnósticos.

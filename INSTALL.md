@@ -1,58 +1,78 @@
-Instalación y Ejecución de FarmEye
+# Instalación y Ejecución de FarmEye  
 
-Este documento proporciona las instrucciones detalladas para instalar, configurar y ejecutar el sistema FarmEye, que permite la detección de enfermedades en gallinas mediante procesamiento de imágenes concurrente.
+Este documento proporciona instrucciones detalladas para instalar, configurar y ejecutar **FarmEye**, un sistema distribuido para la detección de enfermedades en gallinas mediante procesamiento concurrente de imágenes.
 
-- Requisitos del Sistema:
+## **Requisitos del Sistema**
+- **Python** 3.10 o superior  
+- **Redis** (para manejo de tareas en Celery)  
+- **PostgreSQL** (para almacenamiento de resultados)  
 
-.Python 3.10 o superior
+## **Instalación**  
 
-.Redis (para manejo de tareas en Celery)
+### **Clonar el Repositorio**  
+```bash
+git clone https://github.com/Marianagiacconi/farmeye.git
+cd farmeye
+```
 
-.PostgreSQL (para almacenamiento de resultados)
+### **Crear y Activar un Entorno Virtual**  
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
- - Bibliotecas necesarias: pip install -r requirements.txt
+### **Instalar Dependencias**  
+```bash
+pip install -r requirements.txt
+```
 
-- Instalación
+## **Configuración de la Base de Datos**  
 
-    - Clonar el repositorio:
+### **Crear la base de datos en PostgreSQL**  
+Abre PostgreSQL e ingresa:  
+```sql
+CREATE DATABASE farmeye_db;
+```
 
-        .git clone https://github.com/usuario/farmeye.git
-        .cd farmeye
+###  **Configurar la Conexión**  
+Edita el archivo `src/utils/database.py` y ajusta las credenciales de la base de datos según tu configuración.
 
-- Crear y activar un entorno virtual:
 
-    .python3 -m venv venv
-    .source venv/bin/activate 
+## **Ejecución del Servidor**  
+Para iniciar el servidor que recibe imágenes de los clientes:  
+```bash
+python3 -m server.server
+```
 
-- Instalar dependencias:
+## **Ejecución del Cliente**  
+Para enviar imágenes al servidor desde el cliente:  
+# IPV6: 
+```bash
+ python3 src/client/client.py --images src/client/images/image1.webp --host fe80::d25:d801:69ca:92b1%wlp0s20f3 --port 5000
+```
+# IPV4: 
+```bash
+python3 src/client/client.py --images src/client/images/image1.webp 
+```
+Para consultar el historial de predicciones:  
+```bash
+python3 src/client/client.py --historial <user_id>
+```
+## **Ejecución de Celery y Redis**  
 
-    .pip install -r requirements.txt
+### **Iniciar Redis**  
+```bash
+redis-server
+```
 
-- Configuración de la Base de Datos
+### **Ejecutar el Worker de Celery**  
+```bash
+celery -A src.tasks.celery_config worker --loglevel=info
+```
 
-    - Crear la base de datos en PostgreSQL:
+### ***VM **
+# VM MULTIPASS: 
+multipass shell cliente-vm
 
-        .CREATE DATABASE farmeye_db;
-
-        .Configurar la conexión en src/utils/database.py con las credenciales correctas.
-
-- Ejecución del Servidor TCP
-
-    Para iniciar el servidor que recibe imágenes de los clientes:
-
-    .python -m server.server
-
-- Ejecución del Cliente
-
-    Para enviar imágenes al servidor desde el cliente:
-
-    .python src/client/client.py --images src/client/images/image1.webp src/client/images/image2.webp
-
-- Ejecución de Celery y Redis
-
-    Iniciar Redis:
-
-    .redis-server
-
-    Ejecutar el worker de Celery:
-    .celery -A src.tasks.celery_config worker --loglevel=info
+# Activar Multipass shell:
+multipass start cliente-vm

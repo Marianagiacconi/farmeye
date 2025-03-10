@@ -17,23 +17,25 @@ REDIS_HOST = os.getenv("REDIS_URL", "127.0.0.1").split("//")[-1].split(":")[0]
 REDIS_PORT = int(os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0").split(":")[-1].split("/")[0])
 REDIS_CHANNEL = os.getenv("REDIS_CHANNEL", "resultados")
 
-    
-    
-def send_images(image_paths):
+def send_images(image_paths, host=None, port=None):
+    """Envía imágenes al servidor y maneja la conexión de manera segura."""
     user_id = random.randint(1, 2**31 - 1)
-    tasks = {}  # Diccionario para asociar imágenes con sus task_id y predicciones
+    tasks = {}
+
+    host = host or HOST
+    port = port or PORT
 
     try:
-        family, type_, proto, canonname, sockaddr = socket.getaddrinfo(
-            HOST, PORT, socket.AF_UNSPEC, socket.SOCK_STREAM
-        )[0]
+        family, type_, proto, _, sockaddr = socket.getaddrinfo(host, port, socket.AF_UNSPEC, socket.SOCK_STREAM)[0]
     except Exception as e:
-        print(f"Error resolviendo la dirección: {e}")
-        return
+        print(f"Error resolviendo la dirección {host}:{port} - {e}")
+        return user_id, []
 
-    client = socket.socket(family, type_, proto)  # 🔹 Mantener la conexión abierta
+    client = socket.socket(family, type_, proto)
+    
     try:
         client.connect(sockaddr)
+        print(f"Conectado al servidor en {host}:{port}")
 
         for image_path in image_paths:
             if not os.path.exists(image_path):
@@ -58,12 +60,15 @@ def send_images(image_paths):
             print(f"Enviando imagen {filename} ({file_size} bytes)...")
             with open(image_path, "rb") as f:
                 while chunk := f.read(BUFFER_SIZE):
-                    client.sendall(chunk)
-                    ack = client.recv(3)  # Esperar confirmación del servidor
-                    if ack != b"ACK":
-                        raise Exception("No se recibió ACK correctamente.")
+                    try:
+                        client.sendall(chunk)
+                        ack = client.recv(3)  # Esperar confirmación del servidor
+                        if ack != b"ACK":
+                            raise Exception("No se recibió ACK correctamente.")
+                    except BrokenPipeError:
+                        print("Error: El servidor cerró la conexión antes de terminar el envío.")
+                        return user_id, []
 
-            # Esperar la respuesta inicial del servidor (task_id)
             response_data = client.recv(BUFFER_SIZE).decode()
             if not response_data:
                 raise Exception("No se recibió respuesta del servidor.")
@@ -76,11 +81,10 @@ def send_images(image_paths):
             else:
                 print(f"Error en respuesta del servidor: {response}")
 
-            # Ahora esperar la predicción ANTES de enviar la siguiente imagen
             print(f"Esperando predicción del servidor para {filename}...")
 
-            client.settimeout(60)  # Máximo 60 segundos de espera
-            ready, _, _ = select.select([client], [], [], 60)  # Esperar datos
+            client.settimeout(60)
+            ready, _, _ = select.select([client], [], [], 60)
             if ready:
                 prediction_data = client.recv(BUFFER_SIZE).decode()
                 if prediction_data:
@@ -93,12 +97,15 @@ def send_images(image_paths):
 
     except ConnectionResetError:
         print("El servidor cerró la conexión inesperadamente.")
+    except BrokenPipeError:
+        print("El servidor cerró la conexión antes de completar el envío.")
     except Exception as e:
-        print(f" Error inesperado: {e}")
+        print(f"Error inesperado: {e}")
     finally:
-        client.close()  # 🔹 Ahora cerramos la conexión después de recibir todo
+        if client.fileno() != -1: 
+            client.close()
 
-    return user_id, tasks.keys()
+    return user_id, list(tasks.keys())  # lista de task_ids
 
 
 def wait_for_prediction(user_id, timeout=10):
@@ -141,12 +148,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Cliente para enviar imágenes o consultar historial de predicciones")
     parser.add_argument("--images", nargs='+', help="Lista de imágenes a enviar")
     parser.add_argument("--historial", type=int, help="Consultar historial de predicciones de un usuario")
+    parser.add_argument("--host", type=str, default=None, help="Dirección del servidor (IPv4 o IPv6)")
+    parser.add_argument("--port", type=int, default=None, help="Puerto del servidor")
+
     args = parser.parse_args()
 
     if args.historial:
         get_history(args.historial)
     elif args.images:
-        user_id, task_ids = send_images(args.images)
+        user_id, task_ids = send_images(args.images, args.host, args.port)
         print(f"\nUsuario: {user_id}")
         print(f"Tareas creadas: {task_ids if task_ids else 'Ninguna'}")
     else:
